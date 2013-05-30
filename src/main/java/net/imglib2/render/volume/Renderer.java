@@ -42,7 +42,6 @@ import net.imglib2.img.basictypeaccess.array.IntArray;
 import net.imglib2.img.cell.CellImgFactory;
 import net.imglib2.interpolation.randomaccess.NLinearInterpolatorFactory;
 import net.imglib2.interpolation.randomaccess.NearestNeighborInterpolatorFactory;
-import net.imglib2.io.ImgIOException;
 import net.imglib2.realtransform.AffineGet;
 import net.imglib2.realtransform.AffineTransform3D;
 import net.imglib2.realtransform.InvertibleRealTransform;
@@ -50,6 +49,7 @@ import net.imglib2.realtransform.InvertibleRealTransformSequence;
 import net.imglib2.realtransform.Perspective3D;
 import net.imglib2.realtransform.RealViews;
 import net.imglib2.realtransform.Scale;
+import net.imglib2.realtransform.Translation3D;
 import net.imglib2.type.numeric.ARGBDoubleType;
 import net.imglib2.type.numeric.ARGBType;
 import net.imglib2.type.numeric.AbstractARGBDoubleType;
@@ -67,7 +67,9 @@ import net.imglib2.view.composite.RealComposite;
  */
 public class Renderer
 {
-	final static int INTERPOL_NN = 0, INTERPOL_NL = 1;
+	public enum Interpolation { NN, NL };
+	public enum Anaglyph { RedCyan, RedGreen, GreenMagenta };
+	
 	
 	static protected < T extends NumericType< ? > > void render(
 			final RandomAccessible< T > source,
@@ -148,10 +150,101 @@ public class Renderer
 	}
 	
 	
-	final static double accelerate( final double x )
+	final static public double accelerate( final double x )
 	{
 		return 0.5 - 0.5 * Math.cos( Math.PI * x );
 	}
+	
+	final static public double accelerate2( final double x )
+	{
+		return Math.sin( 2 * Math.PI * accelerate( x ) );
+	}
+	
+	/**
+	 * 
+	 * @param affine
+	 * @param animation a value between 0 and 1 that specifies the camera position along a predefined path
+	 */
+	final static public void appendCamera1(
+			final AffineTransform3D affine,
+			final double animation )
+	{
+		final AffineTransform3D rotation = new AffineTransform3D();
+		rotation.rotate( 0, animation * Math.PI * 2 );
+		
+		affine.preConcatenate( rotation );
+	}
+	
+	
+	/**
+	 * 
+	 * @param affine
+	 * @param animation a value between 0 and 1 that specifies the camera position along a predefined path
+	 */
+	final static public void appendCamera2(
+			final AffineTransform3D affine,
+			final double animation )
+	{
+		final AffineTransform3D rotation = new AffineTransform3D();
+		rotation.rotate( 1, animation * Math.PI * 2 );
+		
+		affine.preConcatenate( rotation );
+	}
+	
+	
+	/**
+	 * 
+	 * @param affine
+	 * @param animation a value between 0 and 1 that specifies the camera position along a predefined path
+	 */
+	final static public void appendCamera3(
+			final AffineTransform3D affine,
+			final double animation )
+	{
+		final AffineTransform3D rotation = new AffineTransform3D();
+		rotation.rotate( 2, animation * Math.PI * 2 );
+		
+		affine.preConcatenate( rotation );
+	}
+	
+	
+	/**
+	 * 
+	 * @param affine
+	 * @param animation a value between 0 and 1 that specifies the camera position along a predefined path
+	 */
+	final static public void appendCamera4(
+			final AffineTransform3D affine,
+			final double animation )
+	{
+		final double l = accelerate( animation );
+		
+		final AffineTransform3D rotation = new AffineTransform3D();
+		rotation.rotate( 0, -l * Math.PI * 2 * 2 );
+		rotation.rotate( 1, animation * Math.PI * 2 );
+		
+		affine.preConcatenate( rotation );
+	}
+	
+	/**
+	 * 
+	 * @param affine
+	 * @param animation a value between 0 and 1 that specifies the camera position along a predefined path
+	 */
+	final static public void appendCamera5(
+			final AffineTransform3D affine,
+			final double animation )
+	{
+		final double l1 = accelerate( animation );
+		final double l2 = accelerate2( animation );
+		
+		final AffineTransform3D rotation = new AffineTransform3D();
+		rotation.rotate( 0, -l1 * Math.PI * 2 * 2 );
+		rotation.rotate( 1, l2 * Math.PI / 4 );
+		
+		affine.preConcatenate( rotation );
+	}
+	
 	
 	final static protected Img< FloatType > floatCopyImagePlus( final ImagePlus imp )
 	{
@@ -186,6 +279,7 @@ public class Renderer
 		}
 		return img;
 	}
+	
 	
 	final static protected Img< FloatType > floatCopyCompositeImage( final ImagePlus imp )
 	{
@@ -258,37 +352,21 @@ public class Renderer
 	
 	final static protected AffineTransform3D buildAffineTransform(
 			final AffineGet orientation,
-			final double animation,
 			final long width,
 			final long height,
-			final long depth )
+			final long depth,
+			final double distance )
 	{
-		final double l = accelerate( animation );
-		
-		/* rotation */
-		final AffineTransform3D centerShift = new AffineTransform3D();
-		centerShift.set(
+		/* affine */
+		final AffineTransform3D affine = new AffineTransform3D();
+		affine.set(
 				1, 0, 0, -width / 2.0,
 				0, 1, 0, -height / 2.0,
 				0, 0, 1, -depth / 2.0 );
 		
-		final double f = height;
-		
-		final AffineTransform3D zShift = new AffineTransform3D();
-		zShift.set(
-				1, 0, 0, 0,
-				0, 1, 0, 0,
-				0, 0, 1, depth / 2.0 + f );
-		
-		final AffineTransform3D affine = new AffineTransform3D();
-		final AffineTransform3D rotation = new AffineTransform3D();
-		rotation.rotate( 0, -l * Math.PI * 2 * 2 );
-		rotation.rotate( 1, animation * Math.PI * 2 );
-		
-		affine.preConcatenate( centerShift );
 		affine.preConcatenate( orientation );
-		affine.preConcatenate( rotation );
-		affine.preConcatenate( zShift );
+		
+		affine.preConcatenate( new Translation3D( 0, 0, distance * width ) );
 		
 		return affine;
 	}
@@ -297,18 +375,16 @@ public class Renderer
 			final InvertibleRealTransformSequence transformSequence,
 			final long width,
 			final long height,
-			final long depth )
+			final long depth,
+			final double f,
+			final Translation3D offset )
 	{
-		final AffineTransform3D centerUnshiftXY = new AffineTransform3D();
-		centerUnshiftXY.set(
-				1, 0, 0, width / 2.0,
-				0, 1, 0, height / 2.0,
-				0, 0, 1, 0 );
+		final Translation3D centerUnshiftXY = new Translation3D( width / 2.0, height / 2.0, 0 );
+		centerUnshiftXY.preConcatenate( offset );
 		
 		/* camera */
-		final double f = height;
 		final Perspective3D perspective = Perspective3D.getInstance();
-		final Scale scale = new Scale( f, f, 1 );
+		final Scale scale = new Scale( f * width, f * width, 1 );
 		
 		/* add all to sequence */
 		transformSequence.add( perspective );
@@ -319,12 +395,12 @@ public class Renderer
 	final static protected < T extends NumericType< T > > RandomAccessible< T > buildTransformedSource(
 			final RandomAccessible< T > source,
 			final InvertibleRealTransform transform,
-			final int interpolationMethod )
+			final Interpolation interpolationMethod )
 	{
 		final RealRandomAccessible< T > interpolant;
 		switch ( interpolationMethod )
 		{
-			case INTERPOL_NL:
+			case NL:
 				interpolant = Views.interpolate( source, new NLinearInterpolatorFactory< T >() );
 				break;
 			default:
@@ -338,10 +414,114 @@ public class Renderer
 	final static protected < T extends NumericType< T > > RandomAccessible< T > buildTransformedSource(
 			final RandomAccessibleInterval< T > source,
 			final InvertibleRealTransform transform,
-			final int interpolationMethod )
+			final Interpolation interpolationMethod )
 	{
 		final ExtendedRandomAccessibleInterval< T, RandomAccessibleInterval< T > > extendedImg = Views.extendValue( source, source.randomAccess().get().createVariable() );
 		return buildTransformedSource( extendedImg, transform, interpolationMethod );
+	}
+	
+	
+	final static public void mixRedGreenAnaglyph(
+			final IterableInterval< ARGBType > red,
+			final IterableInterval< ARGBType > green,
+			final double scale )
+	{
+		final Cursor< ARGBType > cRed = red.cursor();
+		final Cursor< ARGBType > cGreen = green.cursor();
+		final double f03 = 0.3 * scale;
+		final double f06 = 0.6 * scale;
+		final double f01 = 0.1 * scale;
+		while ( cRed.hasNext() )
+		{
+			final ARGBType argbRed = cRed.next();
+			final ARGBType argbGreen = cGreen.next();
+			
+			final int argbr = argbRed.get();
+			final int argbg = argbGreen.get();
+			
+			final int rr = ( argbr >> 16 ) & 0xff;
+			final int gr = ( argbr >> 8 ) & 0xff;
+			final int br = argbr & 0xff;
+			
+			final int rg = ( argbg >> 16 ) & 0xff;
+			final int gg = ( argbg >> 8 ) & 0xff;
+			final int bg = argbg & 0xff;
+			
+			final int r = Math.max( 0, Math.min( 255, ( int )Math.round( f03 * rr + f06 * gr + f01 * br ) ) );
+			final int g = Math.max( 0, Math.min( 255, ( int )Math.round( f03 * rg + f06 * gg + f01 + bg ) ) );
+			
+			argbRed.set( ( ( ( r << 8 ) | g ) << 8 ) | 0xff000000 );
+		}
+	}
+	
+	
+	final static public void mixRedCyanAnaglyph(
+			final IterableInterval< ARGBType > red,
+			final IterableInterval< ARGBType > cyan,
+			final double scale )
+	{
+		final Cursor< ARGBType > cRed = red.cursor();
+		final Cursor< ARGBType > cCyan = cyan.cursor();
+		final double f05 = 0.5 * scale;
+		final double f025 = 0.25 * scale;
+		final double f075 = 0.75 * scale;
+		while ( cRed.hasNext() )
+		{
+			final ARGBType argbRed = cRed.next();
+			final ARGBType argbCyan = cCyan.next();
+			
+			final int argbr = argbRed.get();
+			final int argbc = argbCyan.get();
+			
+			final int rr = ( argbr >> 16 ) & 0xff;
+			final int gr = ( argbr >> 8 ) & 0xff;
+			final int br = argbr & 0xff;
+			
+			final int rc = ( argbc >> 16 ) & 0xff;
+			final int gc = ( argbc >> 8 ) & 0xff;
+			final int bc = argbc & 0xff;
+			
+			final int r = Math.max( 0, Math.min( 255, ( int )Math.round( f05 * rr + f025 * gr + f025 * br ) ) );
+			final int g = Math.max( 0, Math.min( 255, ( int )Math.round( f025 * rc + f075 * gc ) ) );
+			final int b = Math.max( 0, Math.min( 255, ( int )Math.round( f025 * rc + f075 * bc ) ) );
+			
+			argbRed.set( ( ( ( r << 8 ) | g ) << 8 ) | b | 0xff000000 );
+		}
+	}
+	
+	
+	final static public void mixGreenMagentaAnaglyph(
+			final IterableInterval< ARGBType > green,
+			final IterableInterval< ARGBType > magenta,
+			final double scale )
+	{
+		final Cursor< ARGBType > cGreen = green.cursor();
+		final Cursor< ARGBType > cMagenta = magenta.cursor();
+		final double f05 = 0.5 * scale;
+		final double f025 = 0.25 * scale;
+		final double f075 = 0.75 * scale;
+		while ( cGreen.hasNext() )
+		{
+			final ARGBType argbGreen = cGreen.next();
+			final ARGBType argbMagenta = cMagenta.next();
+			
+			final int argbg = argbGreen.get();
+			final int argbm = argbMagenta.get();
+			
+			final int rg = ( argbg >> 16 ) & 0xff;
+			final int gg = ( argbg >> 8 ) & 0xff;
+			final int bg = argbg & 0xff;
+			
+			final int rm = ( argbm >> 16 ) & 0xff;
+			final int gm = ( argbm >> 8 ) & 0xff;
+			final int bm = argbm & 0xff;
+			
+			final int r = Math.max( 0, Math.min( 255, ( int )Math.round( f075 * rm + f025 * gm ) ) );
+			final int g = Math.max( 0, Math.min( 255, ( int )Math.round( f025 * rg + f05 * gg + f025 * bg ) ) );
+			final int b = Math.max( 0, Math.min( 255, ( int )Math.round( f025 * gm + f075 * bm ) ) );
+			
+			argbGreen.set( ( ( ( r << 8 ) | g ) << 8 ) | b | 0xff000000 );
+		}
 	}
 	
 	
@@ -355,7 +535,8 @@ public class Renderer
 	 * @param min minimum intensity
 	 * @param max maximum intensity
 	 * @param orientation initial transformation assuming that the 3d volume is centered (e.g. export of Interactive Stack Rotation)
-	 * @param animation a value between 0 and 1 that specifies the camera position along a predefined path
+	 * @param f focal length in multiples of width
+	 * @param offset from camera center (useful to distance-normalize stereo-projections)
 	 * @param stepSize z-stepping for the volume renderer higher is faster but less beautiful
 	 * @param bg background intensity
 	 * @param interpolationMethod 0 NN, 1 NL
@@ -371,10 +552,11 @@ public class Renderer
 			final double min,
 			final double max,
 			final AffineTransform3D orientation,
-			final double animation,
+			final double f,
+			final Translation3D offset,
 			final int stepSize,
 			final double bg,
-			final int interpolationMethod,
+			final Interpolation interpolationMethod,
 			final double alphaScale,
 			final double alphaOffset )
 	{
@@ -389,10 +571,10 @@ public class Renderer
 		/* build transformation */
 		final AffineTransform3D affine = buildAffineTransform(
 				orientation,
-				animation,
 				img.dimension( 0 ),
 				img.dimension( 1 ),
-				img.dimension( 2 ) );
+				img.dimension( 2 ),
+				f );
 		
 		final InvertibleRealTransformSequence transformSequence = new InvertibleRealTransformSequence();
 		
@@ -402,7 +584,9 @@ public class Renderer
 				transformSequence,
 				width,
 				height,
-				img.dimension( 2 ) );
+				img.dimension( 2 ),
+				f,
+				offset );
 		
 		/* build source */
 		final RandomAccessible< FloatType > rotated = buildTransformedSource( img, transformSequence, interpolationMethod );
@@ -432,14 +616,16 @@ public class Renderer
 	
 	
 	/**
-	 * Create an AlphaIntensity rendering of a 3D stack.  No composites or
-	 * time series supported.
+	 * Create an ARGB rendering of a 3D composite stack.  No time series
+	 * supported.
 	 *  
-	 * @param impSource 3d image, will be converted to singel channle float even if it is ARGB-color
+	 * @param impSource 3d image, will be converted to multi-channel float
 	 * @param width width of the target canvas
 	 * @param height height of the target canvas
 	 * @param orientation initial transformation assuming that the 3d volume is centered (e.g. export of Interactive Stack Rotation)
-	 * @param animation a value between 0 and 1 that specifies the camera position along a predefined path
+	 * @param distance between camera and origin in multiples of width
+	 * @param f focal length in multiples of width
+	 * @param offset from camera center (useful to distance-normalize stereo-projections)
 	 * @param stepSize z-stepping for the volume renderer higher is faster but less beautiful
 	 * @param bg background color
 	 * @param interpolationMethod 0 NN, 1 NL
@@ -448,19 +634,23 @@ public class Renderer
 	 * 
 	 * @return
 	 */
-	final static public < T extends AbstractARGBDoubleType< T > > ImagePlus runARGB(
+	final static public < T extends AbstractARGBDoubleType< T > > void runARGB(
 			final ImagePlus impSource,
-			final int width,
-			final int height,
+			final ArrayImg< ARGBType, IntArray > argbCanvas,
 			final AffineTransform3D orientation,
-			final double animation,
+			final double distance,
+			final double f,
+			final Translation3D offset,
 			final long stepSize,
 			final T bg,
-			final int interpolationMethod,
+			final Interpolation interpolationMethod,
 			final RealCompositeARGBDoubleConverter< FloatType > composite2ARGBDouble )
 	{
 		/* copy contents into most appropriate container */
 		final Img< FloatType > img = floatCopyCompositeImage( impSource );
+		
+		final int width = ( int )argbCanvas.dimension( 0 );
+		final int height = ( int )argbCanvas.dimension( 1 );
 		
 		/* collapse composite dimension */
 		final RandomAccessibleInterval< FloatType > xyzc = Views.permute( img, 2, 3 );
@@ -486,10 +676,10 @@ public class Renderer
 		/* build transformation */
 		final AffineTransform3D affine = buildAffineTransform(
 				orientation,
-				animation,
 				xyzc.dimension( 0 ),
 				xyzc.dimension( 1 ),
-				xyzc.dimension( 2 ) );
+				xyzc.dimension( 2 ),
+				distance );
 		
 		final InvertibleRealTransformSequence transformSequence = new InvertibleRealTransformSequence();
 		
@@ -499,7 +689,9 @@ public class Renderer
 				transformSequence,
 				width,
 				height,
-				xyzc.dimension( 2 ) );
+				xyzc.dimension( 2 ),
+				f,
+				offset );
 		
 		/* build source */
 		final RandomAccessible< NativeARGBDoubleType > rotated = buildTransformedSource( argbCopy, transformSequence, interpolationMethod );
@@ -509,10 +701,6 @@ public class Renderer
 		final long minZ	= ( long )Math.floor( bounds.realMin( 2 ) );
 		final long maxZ	= ( long )Math.ceil( bounds.realMax( 2 ) );
 		
-		/* build target */
-		final int[] argbPixels = new int[ width * height ];
-		final ArrayImg< ARGBType, IntArray > argbCanvas = ArrayImgs.argbs( argbPixels, width, height );
-		
 		/* accumulator */
 		final ARGBDoubleLayers< NativeARGBDoubleType > accumulator = new ARGBDoubleLayers< NativeARGBDoubleType >();
 		
@@ -521,37 +709,301 @@ public class Renderer
 		
 		/* render */
 		renderARGBDouble( rotated, argbCanvas, minZ, maxZ, stepSize, nativeBg, accumulator );
+	}
+	
+	
+	/**
+	 * Create an ARGB rendering of a 3D composite stack.  No time series
+	 * supported.
+	 *  
+	 * @param impSource 3d image, will be converted to multi-channel float
+	 * @param width width of the target canvas
+	 * @param height height of the target canvas
+	 * @param orientation initial transformation assuming that the 3d volume is centered (e.g. export of Interactive Stack Rotation)
+	 * @param distance between camera and origin in multiples of width
+	 * @param f focal length in multiples of width
+	 * @param stepSize z-stepping for the volume renderer higher is faster but less beautiful
+	 * @param bg background color
+	 * @param interpolationMethod 0 NN, 1 NL
+	 * @param alphaScale scale factor for linear intensity to alpha transfer 
+	 * @param alphaOffset offset for linear intensity to alpha transfer
+	 * 
+	 * @return
+	 */
+	final static public < T extends AbstractARGBDoubleType< T > > ImagePlus runARGB(
+			final ImagePlus impSource,
+			final int width,
+			final int height,
+			final AffineTransform3D orientation,
+			final double distance,
+			final double f,
+			final Translation3D offset,
+			final long stepSize,
+			final T bg,
+			final Interpolation interpolationMethod,
+			final RealCompositeARGBDoubleConverter< FloatType > composite2ARGBDouble )
+	{
+		/* build target */
+		final int[] argbPixels = new int[ width * height ];
+		final ArrayImg< ARGBType, IntArray > argbCanvas = ArrayImgs.argbs( argbPixels, width, height );
 		
+		/* render */
+		runARGB( impSource, argbCanvas, orientation, distance, f, offset, stepSize, bg, interpolationMethod, composite2ARGBDouble );
+		
+		/* wrap as ImagePlus */
 		final ColorProcessor cp = new ColorProcessor( width, height, argbPixels );
-		
 		return new ImagePlus( impSource.getTitle(), cp );
 	}
 	
-	final static public void main( final String[] args ) throws ImgIOException
+	
+	/**
+	 * Create a stereo ARGB rendering of a 3D composite stack.  No time series
+	 * supported.
+	 *  
+	 * @param impSource 3d image, will be converted to singel channle float even if it is ARGB-color
+	 * @param width width of the target canvas
+	 * @param height height of the target canvas
+	 * @param orientation initial transformation assuming that the 3d volume is centered (e.g. export of Interactive Stack Rotation)
+	 * @param distance between camera and origin in multiples of width
+	 * @param f focal length in multiples of width
+	 * @param stereoBase 1/2 distance of the stereo cameras
+	 * @param offset from camera center
+	 * @param stepSize z-stepping for the volume renderer higher is faster but less beautiful
+	 * @param bg background color
+	 * @param interpolationMethod 0 NN, 1 NL
+	 * @param alphaScale scale factor for linear intensity to alpha transfer 
+	 * @param alphaOffset offset for linear intensity to alpha transfer
+	 * 
+	 * @return
+	 */
+	final static public < T extends AbstractARGBDoubleType< T > > void runARGBStereo(
+			final ImagePlus impSource,
+			final ArrayImg< ARGBType, IntArray > argbCanvasLeft,
+			final ArrayImg< ARGBType, IntArray > argbCanvasRight,
+			final AffineTransform3D orientation,
+			final double distance,
+			final double f,
+			final double stereoBase,
+			final Translation3D offset,
+			final long stepSize,
+			final T bg,
+			final Interpolation interpolationMethod,
+			final RealCompositeARGBDoubleConverter< FloatType > composite2ARGBDouble,
+			final double intensityScale,
+			final Anaglyph anaglyph ) throws InterruptedException
+	{
+		final AffineTransform3D affineLeft = new AffineTransform3D();
+		affineLeft.set(
+				1, 0, 0, stereoBase,
+				0, 1, 0, 0,
+				0, 0, 1, 0 );
+		affineLeft.concatenate( orientation );
+		
+		final AffineTransform3D affineRight = orientation.copy();
+		affineRight.set(
+				1, 0, 0, -stereoBase,
+				0, 1, 0, 0,
+				0, 0, 1, 0 );
+		affineRight.concatenate( orientation );
+		
+		final Thread tLeft = new Thread(
+				new Runnable(){
+					@Override
+					final public void run()
+					{
+						runARGB(
+								impSource,
+								argbCanvasLeft,
+								affineLeft,
+								distance,
+								f,
+								offset.inverse(),
+								stepSize,
+								bg,
+								interpolationMethod,
+								composite2ARGBDouble );
+					}
+				} );
+		
+		final Thread tRight = new Thread(
+				new Runnable(){
+					@Override
+					final public void run()
+					{
+						runARGB(
+								impSource,
+								argbCanvasRight,
+								affineRight,
+								distance,
+								f,
+								offset,
+								stepSize,
+								bg,
+								interpolationMethod,
+								composite2ARGBDouble );
+					}
+				} );
+		tLeft.start();
+		tRight.start();
+		tLeft.join();
+		tRight.join();
+		
+		switch ( anaglyph )
+		{
+		case RedGreen:
+			mixRedGreenAnaglyph( argbCanvasLeft, argbCanvasRight, intensityScale );
+			break;
+		case RedCyan:
+			mixRedCyanAnaglyph( argbCanvasLeft, argbCanvasRight, intensityScale );
+			break;
+		case GreenMagenta:
+			mixGreenMagentaAnaglyph( argbCanvasLeft, argbCanvasRight, intensityScale );
+		}
+	}
+	
+	/**
+	 * Create a stereo ARGB rendering of a 3D composite stack.  No time series
+	 * supported.
+	 *  
+	 * @param impSource 3d image, will be converted to singel channle float even if it is ARGB-color
+	 * @param width width of the target canvas
+	 * @param height height of the target canvas
+	 * @param orientation initial transformation assuming that the 3d volume is centered (e.g. export of Interactive Stack Rotation)
+	 * @param distance between camera and origin in multiples of width
+	 * @param f focal length in multiples of width
+	 * @param stereoBase 1/2 distance of the stereo cameras
+	 * @param offset from camera center (useful to distance-normalize stereo-projections)
+	 * @param stepSize z-stepping for the volume renderer higher is faster but less beautiful
+	 * @param bg background color
+	 * @param interpolationMethod 0 NN, 1 NL
+	 * @param alphaScale scale factor for linear intensity to alpha transfer 
+	 * @param alphaOffset offset for linear intensity to alpha transfer
+	 * 
+	 * @return
+	 */
+	final static public < T extends AbstractARGBDoubleType< T > > ImagePlus runARGBStereo(
+			final ImagePlus impSource,
+			final int width,
+			final int height,
+			final AffineTransform3D orientation,
+			final double distance,
+			final double f,
+			final double stereoBase,
+			final Translation3D offset,
+			final long stepSize,
+			final T bg,
+			final Interpolation interpolationMethod,
+			final RealCompositeARGBDoubleConverter< FloatType > composite2ARGBDouble,
+			final double intensityScale,
+			final Anaglyph anaglyph ) throws InterruptedException
+	{
+		/* build targets */
+		final int[] argbPixelsLeft = new int[ width * height ];
+		final ArrayImg< ARGBType, IntArray > argbCanvasLeft = ArrayImgs.argbs( argbPixelsLeft, width, height );
+		final int[] argbPixelsRight = new int[ width * height ];
+		final ArrayImg< ARGBType, IntArray > argbCanvasRight = ArrayImgs.argbs( argbPixelsRight, width, height );
+		
+		/* wrap as ImagePlus */
+		final ColorProcessor cp = new ColorProcessor( width, height, argbPixelsLeft );
+		final ImagePlus omp = new ImagePlus( impSource.getTitle() + " anaglyph", cp );
+		
+		/* render */
+		runARGBStereo(
+				impSource,
+				argbCanvasLeft,
+				argbCanvasRight,
+				orientation,
+				distance,
+				f,
+				stereoBase,
+				offset,
+				stepSize,
+				bg,
+				interpolationMethod,
+				composite2ARGBDouble,
+				intensityScale,
+				anaglyph );
+		
+		return omp;
+	}
+	
+	
+	
+	final static public void main( final String[] args ) throws Exception
 	{
 		new ImageJ();
 		
-		/* gray scale */
-		final ImagePlus imp = new ImagePlus( "/home/saalfeld/tmp/valia/2.tif" );
-		final ImagePlus omp = runGray(
-				imp,
-				imp.getWidth(),
-				imp.getHeight(),
-				0,
-				0.03,
-				new AffineTransform3D(),
-				0,
-				1,
-				1,
-				0,
-				1.0 / 0.1,
-				-0.003 );
+//		/* gray scale */
+//		final ImagePlus imp = new ImagePlus( "/home/saalfeld/tmp/valia/2.tif" );
+//		final ImagePlus omp = runGray(
+//				imp,
+//				imp.getWidth(),
+//				imp.getHeight(),
+//				0,
+//				0.03,
+//				new AffineTransform3D(),
+//				0,
+//				1,
+//				0,
+//				Interpolation.NN,
+//				1.0 / 0.1,
+//				-0.003 );
+//		
+//		omp.show();
 		
-		omp.show();
+		
+//		/* color */
+//		final ImagePlus imp2 = new ImagePlus( "/home/saalfeld/examples/l1-cns-05-05-5-DPX-9.tif" );
+//		
+//		final ARGBDoubleType bgARGB = new ARGBDoubleType( 1, 0, 0, 0 );
+//		
+//		final double s = 2.0 / 4095.0;
+//		final double a = 1.0;
+//		
+//		final RealCompositeARGBDoubleConverter< FloatType > composite2ARGBDouble =
+//				new RealCompositeARGBDoubleConverter< FloatType >( imp2.getNChannels() );
+//		
+//		composite2ARGBDouble.setARGB( new ARGBDoubleType( a, s, 0, 0 ), 0 );
+//		composite2ARGBDouble.setARGB( new ARGBDoubleType( 0.35 * a, s, s, s ), 1 );
+//		composite2ARGBDouble.setARGB( new ARGBDoubleType( 0, s, s, s ), 2 );
+//		composite2ARGBDouble.setARGB( new ARGBDoubleType( a, 0, s, 0 ), 3 );
+//		composite2ARGBDouble.setARGB( new ARGBDoubleType( a, 0, 0, s ), 4 );
+//		
+//		final ImagePlus omp2 = runARGB(
+//				imp2,
+//				imp2.getWidth(),
+//				imp2.getHeight(),
+//				new AffineTransform3D(),
+//				0,
+//				1,
+//				bgARGB,
+//				Interpolation.NN,
+//				composite2ARGBDouble );
+//		
+//		omp2.show();
 		
 		
-		/* color */
+		/* color 2 */
 		final ImagePlus imp2 = new ImagePlus( "/home/saalfeld/examples/l1-cns-05-05-5-DPX-9.tif" );
+		
+		final int width = 1280;
+		final int height = 720;
+		
+		/* orientation */
+		final AffineTransform3D affine = new AffineTransform3D();
+		affine.set(
+				-0.9466575, 0.27144936, -0.17364806, 0.0,
+				-0.2915748, -0.9509912, 0.102940395, imp2.getHeight() / 20.0,
+				-0.13719493, 0.14808047, 0.97941136, 0.0 );
+		appendCamera5( affine, 0.25 );
+		
+		/* camera */
+		final double distance = 1.25;
+		final double f = 1;
+		
+		/* stereo-shifts */
+		final double disp2 = imp2.getWidth() / 15.0;
+		final Translation3D offset = new Translation3D( 0.9 * ( disp2 * width / imp2.getWidth() ), 0, 0 );
 		
 		final ARGBDoubleType bgARGB = new ARGBDoubleType( 1, 0, 0, 0 );
 		
@@ -567,16 +1019,21 @@ public class Renderer
 		composite2ARGBDouble.setARGB( new ARGBDoubleType( a, 0, s, 0 ), 3 );
 		composite2ARGBDouble.setARGB( new ARGBDoubleType( a, 0, 0, s ), 4 );
 		
-		final ImagePlus omp2 = runARGB(
+		final ImagePlus omp2 = runARGBStereo(
 				imp2,
-				imp2.getWidth(),
-				imp2.getHeight(),
-				new AffineTransform3D(),
-				0,
+				width,
+				height,
+				affine,
+				distance,
+				f,
+				disp2,
+				offset,
 				1,
 				bgARGB,
-				0,
-				composite2ARGBDouble );
+				Interpolation.NN,
+				composite2ARGBDouble,
+				3,
+				Anaglyph.RedCyan );
 		
 		omp2.show();
 	}
