@@ -70,7 +70,6 @@ public class Renderer
 	public enum Interpolation { NN, NL };
 	public enum Anaglyph { RedCyan, RedGreen, GreenMagenta };
 	
-	
 	static protected < T extends NumericType< ? > > void render(
 			final RandomAccessible< T > source,
 			final RandomAccessibleInterval< T > target,
@@ -547,21 +546,27 @@ public class Renderer
 	 */
 	final static public ImagePlus runGray(
 			final ImagePlus impSource,
+			//final RandomAccessibleInterval< UnsignedByteType > byteCanvas,
 			final int width,
 			final int height,
-			final double min,
-			final double max,
 			final AffineTransform3D orientation,
+			final double distance,
 			final double f,
 			final Translation3D offset,
-			final int stepSize,
+			final long stepSize,
 			final double bg,
 			final Interpolation interpolationMethod,
+			final double min,
+			final double max,
 			final double alphaScale,
 			final double alphaOffset )
 	{
 		/* copy contents into most appropriate container */
 		final Img< FloatType > img = floatCopyImagePlus( impSource );
+		//final ImagePlusImg< FloatType, ? > img = ImagePlusImgs.from( impSource );
+		
+//		final int width = ( int )byteCanvas.dimension( 0 );
+//		final int height = ( int )byteCanvas.dimension( 1 );
 		
 		System.out.println(
 				img.dimension( 0 ) + " " + 
@@ -607,7 +612,7 @@ public class Renderer
 		render( rotated, floatCanvas, minZ, maxZ, stepSize, bg, accumulator );
 		
 		final FloatProcessor fp = new FloatProcessor( width, height, floatPixels );
-		new ImagePlus( impSource.getTitle(), fp ).show();
+//		new ImagePlus( impSource.getTitle(), fp ).show();
 		fp.setMinAndMax( min, max );
 		final ByteProcessor bp = ( ByteProcessor )fp.convertToByte( true );
 		
@@ -933,23 +938,35 @@ public class Renderer
 	{
 		new ImageJ();
 		
-//		/* gray scale */
-//		final ImagePlus imp = new ImagePlus( "/home/saalfeld/tmp/valia/2.tif" );
-//		final ImagePlus omp = runGray(
-//				imp,
+		final AffineTransform3D t = new AffineTransform3D();
+		t.rotate( 0, 135.0 / 180.0 * Math.PI );
+//		t.set(
+//				1.0, 0.0, 0.0, 0.0,
+//				0.0, 0.6820009, -0.731357, 0.0,
+//				0.0, 0.731357, 0.6820009, 0.0);
+		t.scale( 0.8 );
+		
+		/* gray scale */
+		//final ImagePlus imp = new ImagePlus( "/home/saalfeld/tmp/valia/2.tif" );
+		final ImagePlus imp = new ImagePlus( "/home/saalfeld/tmp/valia/tassos/1-2.tif" );
+		final ImagePlus omp = runGray(
+				imp,
 //				imp.getWidth(),
 //				imp.getHeight(),
-//				0,
-//				0.03,
-//				new AffineTransform3D(),
-//				0,
-//				1,
-//				0,
-//				Interpolation.NN,
-//				1.0 / 0.1,
-//				-0.003 );
-//		
-//		omp.show();
+				400,
+				300,
+				t,
+				0,
+				1,
+				new Translation3D(),
+				1,
+				0,
+				Interpolation.NL,
+				0,
+				0.06,
+				1.0 / 0.1,
+				-0.005 );
+		omp.show();
 		
 		
 //		/* color */
@@ -984,57 +1001,70 @@ public class Renderer
 		
 		
 		/* color 2 */
-		final ImagePlus imp2 = new ImagePlus( "/home/saalfeld/examples/l1-cns-05-05-5-DPX-9.tif" );
+//		final ImagePlus imp2 = new ImagePlus( "/home/saalfeld/examples/l1-cns-05-05-5-DPX-9.tif" );
+//		
+//		final int width = 1280;
+//		final int height = 720;
+//		
+//		/* orientation */
+//		final AffineTransform3D affine = new AffineTransform3D();
+//		affine.set(
+//				-0.9466575, 0.27144936, -0.17364806, 0.0,
+//				-0.2915748, -0.9509912, 0.102940395, imp2.getHeight() / 20.0,
+//				-0.13719493, 0.14808047, 0.97941136, 0.0 );
+//		appendCamera5( affine, 0.0 );
+//		
+//		/* camera */
+//		final double distance = 1.25;
+//		final double f = 1;
+//		
+//		/* stereo-shifts */
+//		final double disp2 = imp2.getWidth() / 15.0;
+//		final Translation3D offset = new Translation3D( 0.9 * ( disp2 * width / imp2.getWidth() ), 0, 0 );
+//		
+//		final ARGBDoubleType bgARGB = new ARGBDoubleType( 1, 0, 0, 0 );
+//		
+//		final double s = 2.0 / 4095.0;
+//		final double a = 1.0;
+//		
+//		final RealCompositeARGBDoubleConverter< FloatType > composite2ARGBDouble =
+//				new RealCompositeARGBDoubleConverter< FloatType >( imp2.getNChannels() );
+//		
+//		composite2ARGBDouble.setARGB( new ARGBDoubleType( a, s, 0, 0 ), 0 );
+//		composite2ARGBDouble.setARGB( new ARGBDoubleType( 0.35 * a, 0, 0, 0 ), 1 );
+//		composite2ARGBDouble.setARGB( new ARGBDoubleType( 0, s, s, s ), 2 );
+//		composite2ARGBDouble.setARGB( new ARGBDoubleType( a, 0, s, 0 ), 3 );
+//		composite2ARGBDouble.setARGB( new ARGBDoubleType( a, 0, 0, s ), 4 );
+//		
+//		final ImagePlus omp2 = runARGB(				
+//				imp2,
+//				imp2.getWidth(),
+//				imp2.getHeight(),
+//				new AffineTransform3D(),
+//				0,
+//				1,
+//				new Translation3D(),
+//				1,
+//				bgARGB,
+//				Interpolation.NN,
+//				composite2ARGBDouble );
 		
-		final int width = 1280;
-		final int height = 720;
+//		final ImagePlus omp2 = runARGBStereo(
+//				imp2,
+//				width,
+//				height,
+//				affine,
+//				distance,
+//				f,
+//				disp2,
+//				offset,
+//				1,
+//				bgARGB,
+//				Interpolation.NN,
+//				composite2ARGBDouble,
+//				3,
+//				Anaglyph.RedCyan );
 		
-		/* orientation */
-		final AffineTransform3D affine = new AffineTransform3D();
-		affine.set(
-				-0.9466575, 0.27144936, -0.17364806, 0.0,
-				-0.2915748, -0.9509912, 0.102940395, imp2.getHeight() / 20.0,
-				-0.13719493, 0.14808047, 0.97941136, 0.0 );
-		appendCamera5( affine, 0.25 );
-		
-		/* camera */
-		final double distance = 1.25;
-		final double f = 1;
-		
-		/* stereo-shifts */
-		final double disp2 = imp2.getWidth() / 15.0;
-		final Translation3D offset = new Translation3D( 0.9 * ( disp2 * width / imp2.getWidth() ), 0, 0 );
-		
-		final ARGBDoubleType bgARGB = new ARGBDoubleType( 1, 0, 0, 0 );
-		
-		final double s = 2.0 / 4095.0;
-		final double a = 1.0;
-		
-		final RealCompositeARGBDoubleConverter< FloatType > composite2ARGBDouble =
-				new RealCompositeARGBDoubleConverter< FloatType >( imp2.getNChannels() );
-		
-		composite2ARGBDouble.setARGB( new ARGBDoubleType( a, s, 0, 0 ), 0 );
-		composite2ARGBDouble.setARGB( new ARGBDoubleType( 0.35 * a, s, s, s ), 1 );
-		composite2ARGBDouble.setARGB( new ARGBDoubleType( 0, s, s, s ), 2 );
-		composite2ARGBDouble.setARGB( new ARGBDoubleType( a, 0, s, 0 ), 3 );
-		composite2ARGBDouble.setARGB( new ARGBDoubleType( a, 0, 0, s ), 4 );
-		
-		final ImagePlus omp2 = runARGBStereo(
-				imp2,
-				width,
-				height,
-				affine,
-				distance,
-				f,
-				disp2,
-				offset,
-				1,
-				bgARGB,
-				Interpolation.NN,
-				composite2ARGBDouble,
-				3,
-				Anaglyph.RedCyan );
-		
-		omp2.show();
+//		omp2.show();
 	}
 }
